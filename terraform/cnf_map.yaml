@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  key_a: 100.100.100.100
+  key_b: "true"
+  key_c: "1000"
