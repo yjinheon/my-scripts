@@ -1,0 +1,16 @@
+services:
+  db:
+    container_name: "postgres_cdc"
+    image: debezium/postgres:16
+    restart: always
+    volumes:
+      - ~/docker-volumes/postgresql-cdc/data:/var/lib/postgresql/data # server : docker
+    ports:
+      - "15432:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER} # .env 파일 내 변수 작성
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - APP_DB_USER=${APP_DB_USER}
+      - APP_DB_PASS=${APP_DB_PASS}
+      - APP_DB_NAME=${APP_DB_NAME}
+      - SCHEMA_NAME=${SCHEMA_NAME}
