@@ -1,0 +1,22 @@
+services:
+  elasticsearch:
+    image: elasticsearch:8.17.1
+    container_name: es01
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false # 보안 비활성화
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    ports:
+      - "19200:9200"
+    networks:
+      - elastic
+
+volumes:
+  es_data:
+    driver: local
+
+networks:
+  elastic:
+    driver: bridge
