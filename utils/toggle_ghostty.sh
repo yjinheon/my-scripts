@@ -15,7 +15,7 @@ echo "Current background-opacity is $current_opacity"
 
 # Determine the new opacity value
 if [ "$current_opacity" == "1.0" ]; then
-  new_opacity="0.65"
+  new_opacity="0.75" # 0.8
 else
   new_opacity="1.0"
 fi

@@ -7,7 +7,8 @@ WALLPAPER_NAME="frog_study.gif"
 # Function to initialize swww if not running
 init_swww() {
   if ! swww query; then
-    swww init
+    swww-daemon &
+    sleep 0.1
   fi
 }
 
@@ -21,6 +22,10 @@ set_wallpaper() {
     exit 1
   fi
 
+  echo "Setting wallpaper: $wallpaper"
+
+  sleep 1
+
   swww img "$wallpaper" \
     -t any \
     --transition-bezier 0.0,0.0,1.0,1.0 \
@@ -31,7 +36,9 @@ set_wallpaper() {
 
 # Main execution
 main() {
-  init_swww
+  init_swww &
+  # swww-daemon &
+  # sleep 0.1 &
   set_wallpaper
 }
 
