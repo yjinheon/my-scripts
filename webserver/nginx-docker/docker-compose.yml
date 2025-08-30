@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:1.25
+    container_name: nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./html:/usr/share/nginx/html:ro
+    restart: unless-stopped

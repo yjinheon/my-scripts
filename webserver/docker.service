@@ -1,0 +1,23 @@
+[Unit]
+Description=Docker Daemon (Offline Install)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/adata/installed/docker/dockerd \
+    --data-root=/home/adata/installed/docker-data
+
+# 환경 변수 설정 (PATH에 containerd, runc 포함된 디렉토리 포함)
+Environment="PATH=/home/adata/installed/docker:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# docker.sock 권한 조정 (필요할 경우 docker 그룹 기반 접근)
+ExecStartPost=/bin/chmod 666 /var/run/docker.sock
+
+# 안정성 설정
+Restart=always
+RestartSec=2
+LimitNOFILE=1048576
+LimitNPROC=1048576
+
+[Install]
+WantedBy=multi-user.target
