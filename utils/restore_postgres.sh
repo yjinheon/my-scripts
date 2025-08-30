@@ -2,9 +2,9 @@
 
 # Define variables for database connection details
 
-DB_NAME="rnd"
-DB_USER="rnduser"
-DB_HOST="adata-metadb.ckoafiitqe7y.ap-northeast-2.rds.amazonaws.com"
+DB_NAME="your_database_name"
+DB_USER="username"
+DB_HOST="your_postgres_host"
 DB_PORT="5432"
 BACKUP_DIR="postgres_backup"
 DATE=$(date +"%Y%m%d%H%M")
@@ -17,7 +17,7 @@ echo "Latest backup file: $BACKUP_FILE"
 
 #POSTGRES_USER="postgres"
 
-export PGPASSWORD="rnduser"
+export PGPASSWORD="your_password"
 
 # Restore the backup
 echo "Restoring the database $DB_NAME from $BACKUP_FILE..."

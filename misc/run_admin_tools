@@ -1,0 +1,1 @@
+admintools -t create_db -s v_node0001,v_node0002  -d SCV -p aedata0828@@ -c /data

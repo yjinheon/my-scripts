@@ -24,7 +24,7 @@ set_wallpaper() {
 
   echo "Setting wallpaper: $wallpaper"
 
-  sleep 1
+  sleep 2
 
   swww img "$wallpaper" \
     -t any \
