@@ -2,6 +2,10 @@
 # Python    #
 #-----------#
 
+# env
+
+common.env
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
