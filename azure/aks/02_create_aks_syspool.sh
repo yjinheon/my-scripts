@@ -33,5 +33,3 @@ kubectl taint nodes -l agentpool="$SYSPOOL" node-role.kubernetes.io/system=true:
 
 echo "== 클러스터 생성 완료 =="
 kubectl get nodes -o wide
-
-#ㅠㅠB

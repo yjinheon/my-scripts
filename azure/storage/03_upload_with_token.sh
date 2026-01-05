@@ -4,7 +4,7 @@ set -euo pipefail
 
 source .env
 
-AZ_SAS_TOKEN="se=2027-09-01T00%3A00%3A00Z&sp=rwdlac&spr=https&sv=2022-11-02&ss=b&srt=sco&sig=Bptt7iorJbPedRkwL0aihSTAHsX9zoFSLS6baZF%2BUbs%3D"
+AZ_SAS_TOKEN="some-az-sas-token"
 
 az storage blob upload-batch \
   --account-name "$SA" \
