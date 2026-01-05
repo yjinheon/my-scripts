@@ -1,0 +1,278 @@
+# ============================================
+# 📌 DuckDB + PostgreSQL + MySQL + CSV 작업용 JUSTFILE
+#    - DuckDB 파일/메모리 실행
+#    - CSV/Parquet 읽기
+#    - PostgreSQL/MySQL 직접 읽기 (DuckDB FDW)
+#    - psql 기본 조작
+#    - 편의 유틸리티
+# ============================================
+
+
+# ===========================
+#      MinIO 환경 설정
+# ===========================
+
+export MINIO_ENDPOINT := "http://localhost:9000"     # http://minio:9000 도 가능
+export MINIO_ACCESS_KEY := "${MINIO_ACCESS_KEY}"
+export MINIO_SECRET_KEY := "${MINIO_SECRET_KEY}"
+export MINIO_REGION := "us-east-1"                   # MinIO 기본값
+
+# bash 사용
+set shell := ["bash", "-cu"]
+
+# 자주 쓰는 환경 변수
+export PG_HOST := "localhost"
+export PG_USER := "postgres"
+export PG_DB   := "postgres"
+export PG_PORT := "5432"
+
+export MYSQL_HOST := "localhost"
+export MYSQL_USER := "root"
+export MYSQL_PW   := ""
+export MYSQL_DB   := "test"
+export MYSQL_PORT := "3306"
+
+export DUCKDB_FILE := "local.duckdb"
+
+
+# ============================================
+# ========== PostgreSQL (psql) 관련 ===========
+# ============================================
+
+# PostgreSQL 쉘 접속
+@psql-shell:
+    # PostgreSQL psql CLI에 접속
+    psql -h $PG_HOST -U $PG_USER -d $PG_DB -p $PG_PORT
+
+# DB 목록 확인 (한글 주석)
+@psql-list-db:
+    # PostgreSQL 서버의 전체 데이터베이스 목록 조회
+    psql -h $PG_HOST -U $PG_USER -p $PG_PORT -c "\l"
+
+# 특정 DB의 테이블 목록 조회
+@psql-tables db:
+    # 데이터베이스 내 테이블 목록 확인
+    psql -h $PG_HOST -U $PG_USER -d {{db}} -c "\dt"
+
+# 테이블 상세 정보 조회
+@psql-describe db table:
+    psql -h $PG_HOST -U $PG_USER -d {{db}} -c "\d {{table}}"
+
+# 테이블 레코드 n개 조회
+@psql-head db table n="10":
+    psql -h $PG_HOST -U $PG_USER -d {{db}} \
+         -c "SELECT * FROM {{table}} LIMIT {{n}};"
+
+# PostgreSQL → SQL dump 파일로 백업
+@pg-backup out="dump.sql":
+    pg_dump -h $PG_HOST -U $PG_USER -d $PG_DB > {{out}}
+
+# SQL 파일로 복원
+@pg-restore file:
+    psql -h $PG_HOST -U $PG_USER -d $PG_DB -f {{file}}
+
+
+# ============================================
+# =============== DuckDB 관련 =================
+# ============================================
+
+# DuckDB 파일로 실행
+@duck:
+    duckdb $DUCKDB_FILE
+
+# DuckDB 메모리 모드로 실행
+@duck-memory:
+    duckdb
+
+# DuckDB 내 테이블 목록 확인
+@duck-tables:
+    echo "SHOW ALL TABLES;" | duckdb $DUCKDB_FILE
+
+# 테이블 스키마 조회
+@duck-describe table:
+    echo "DESCRIBE {{table}};" | duckdb $DUCKDB_FILE
+
+# 테이블 10개 조회
+@duck-head table:
+    echo "SELECT * FROM {{table}} LIMIT 10;" | duckdb $DUCKDB_FILE
+
+
+# ============================================
+# ============== CSV 읽기 관련 ===============
+# ============================================
+
+# CSV 읽어서 쿼리 (DuckDB)
+@duck-read-csv csv:
+    # CSV 파일에서 10개만 미리보기
+    echo "SELECT * FROM read_csv_auto('{{csv}}') LIMIT 10;" \
+    | duckdb $DUCKDB_FILE
+
+# CSV → DuckDB 테이블로 저장
+@duck-import-csv table csv:
+    echo "CREATE OR REPLACE TABLE {{table}} AS SELECT * FROM read_csv_auto('{{csv}}');" \
+    | duckdb $DUCKDB_FILE
+
+# DuckDB 테이블 → CSV 내보내기
+@duck-export-csv table out:
+    echo "COPY {{table}} TO '{{out}}' (HEADER, DELIMITER ',');" \
+    | duckdb $DUCKDB_FILE
+
+
+# ============================================
+# ============== Parquet 관련 =================
+# ============================================
+
+# Parquet 미리보기
+@duck-read-parquet file:
+    echo "SELECT * FROM read_parquet('{{file}}') LIMIT 10;" | duckdb $DUCKDB_FILE
+
+# DuckDB 테이블 → Parquet 저장
+@duck-export-parquet table out:
+    echo "COPY {{table}} TO '{{out}}' (FORMAT PARQUET);" | duckdb $DUCKDB_FILE
+
+
+# ============================================
+# ======== DuckDB에서 PostgreSQL 읽기 =========
+# ============================================
+
+# 🔥 DuckDB에서 PostgreSQL 연결 후 테이블 조회
+@duck-read-postgres table:
+    # duckdb에서 postgres_scanner 확장을 설치하고 사용 후 SELECT
+    echo "
+    INSTALL postgres_scanner;
+    LOAD postgres_scanner;
+
+    SELECT * FROM postgres_scan(
+        host='$PG_HOST',
+        port=$PG_PORT,
+        database='$PG_DB',
+        user='$PG_USER',
+        password='',
+        table='{{table}}'
+    ) LIMIT 10;
+    " | duckdb $DUCKDB_FILE
+
+# 🔥 Postgres 테이블 → DuckDB 테이블로 저장
+@duck-import-postgres table:
+    echo "
+    INSTALL postgres_scanner;
+    LOAD postgres_scanner;
+
+    CREATE OR REPLACE TABLE {{table}} AS 
+    SELECT * FROM postgres_scan(
+        host='$PG_HOST',
+        port=$PG_PORT,
+        database='$PG_DB',
+        user='$PG_USER',
+        password='',
+        table='{{table}}'
+    );
+    " | duckdb $DUCKDB_FILE
+
+
+# ============================================
+# ======== DuckDB에서 MySQL 읽기 ==============
+# ============================================
+
+@duck-read-mysql table:
+    echo "
+    INSTALL mysql;
+    LOAD mysql;
+
+    SELECT * FROM mysql_scan(
+        host='$MYSQL_HOST',
+        port=$MYSQL_PORT,
+        username='$MYSQL_USER',
+        password='$MYSQL_PW',
+        database='$MYSQL_DB',
+        table='{{table}}'
+    ) LIMIT 10;
+    " | duckdb $DUCKDB_FILE
+
+@duck-import-mysql table:
+    echo "
+    INSTALL mysql;
+    LOAD mysql;
+
+    CREATE OR REPLACE TABLE {{table}} AS
+    SELECT * FROM mysql_scan(
+        host='$MYSQL_HOST',
+        port=$MYSQL_PORT,
+        username='$MYSQL_USER',
+        password='$MYSQL_PW',
+        database='$MYSQL_DB',
+        table='{{table}}'
+    );
+    " | duckdb $DUCKDB_FILE
+
+
+# ============================================
+# ============== 유틸리티 =====================
+# ============================================
+
+# SQL 포맷팅
+@sql-format file:
+    sqlformat --reindent --keywords upper --identifiers lower {{file}}
+
+# CPU 사용량 watcher
+@watch-cpu:
+    watch -n 1 "ps -eo pid,ppid,cmd,%mem,%cpu --sort=-%cpu | head"
+
+
+# ============================================
+# =========== DuckDB: MinIO Parquet ==========
+# ============================================
+
+@duck-minio-read-parquet bucket key:
+    # 예시: just duck-minio-read-parquet mybucket data/file.parquet
+    echo "
+    INSTALL httpfs;
+    LOAD httpfs;
+
+    -- MinIO endpoint 설정
+    SET s3_endpoint='{{MINIO_ENDPOINT}}';
+    SET s3_url_style='path';
+    SET s3_use_ssl=false;
+
+    SET s3_access_key_id='{{MINIO_ACCESS_KEY}}';
+    SET s3_secret_access_key='{{MINIO_SECRET_KEY}}';
+    SET s3_region='{{MINIO_REGION}}';
+
+    SELECT * FROM read_parquet('s3://{{bucket}}/{{key}}') LIMIT 10;
+    " | duckdb $DUCKDB_FILE
+
+
+
+@duck-minio-read-csv bucket key:
+    echo "
+    INSTALL httpfs;
+    LOAD httpfs;
+
+    SET s3_endpoint='{{MINIO_ENDPOINT}}';
+    SET s3_url_style='path';
+    SET s3_use_ssl=false;
+
+    SET s3_access_key_id='{{MINIO_ACCESS_KEY}}';
+    SET s3_secret_access_key='{{MINIO_SECRET_KEY}}';
+    SET s3_region='{{MINIO_REGION}}';
+
+    SELECT * FROM read_csv_auto('s3://{{bucket}}/{{key}}') LIMIT 10;
+    " | duckdb $DUCKDB_FILE
+
+
+
+@duck-minio-read-parquet-dir bucket prefix:
+    echo "
+    INSTALL httpfs;
+    LOAD httpfs;
+
+    SET s3_endpoint='{{MINIO_ENDPOINT}}';
+    SET s3_url_style='path';
+    SET s3_use_ssl=false;
+
+    SET s3_access_key_id='{{MINIO_ACCESS_KEY}}';
+    SET s3_secret_access_key='{{MINIO_SECRET_KEY}}';
+    SET s3_region='{{MINIO_REGION}}';
+
+    SELECT * FROM read_parquet('s3://{{bucket}}/{{prefix}}/*.parquet') LIMIT 10;
+    " | duckdb $DUCKDB_FILE

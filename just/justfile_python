@@ -1,0 +1,149 @@
+_ default:
+    @just --choose -f {{ justfile() }} -d {{ invocation_directory() }}
+
+
+# =========================
+# init 
+# =========================
+
+# 의존성 관리
+# - uv lock --upgrade : pyproject 기반으로 lock 파일 갱신
+# - uv sync --all-extras --frozen : lock 기반으로 패키지 동기화
+# - just hook : pre-commit hook 설치
+install:
+    uv lock --upgrade
+    uv sync --all-extras --frozen
+    @just hook
+
+# git pre-commit hook 설치
+# - pre-commit 이 pyproject에 포함돼 있어야 함
+hook:
+    uv run pre-commit install
+    @echo "pre-commit hook installed"
+
+
+# =========================
+# (Lint / Type check / Test)
+# =========================
+
+# 코드 포맷팅 및 자동 수정 린터 실행
+# - ruff format: Python 코드 포맷팅 
+# - ruff check --fix: 린터 실행 및 수정 가능한 문제 자동 수정
+# - mypy: 타입 어노테이션이 올바른지 확인하는 타입 체커
+lint:
+    uv run ruff format
+    uv run ruff check --fix
+    uv run mypy .
+
+# 테스트 실행
+# 사용 예시:
+#   just test                     # 전체 테스트
+#   just test tests/test_api.py   # 특정 파일
+#   just test -k "test_login"     # 패턴 매칭
+#   just test -v                  # verbose
+test *args:
+    uv run --no-sync pytest {{ args }}
+
+# CI용 전체 체크 (lint + test)
+check:
+    @just lint
+    @just test
+
+
+# =========================
+# FastAPI
+# =========================
+
+#dev
+serve-dev:
+    @echo "starting FastAPI Development server with hot reload..."
+    uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 5001
+
+# prod 
+serve-prod:
+    @echo "FastAPI Production server starting with 4 workers..."
+    uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+
+# 커스텀 host/port 서버 (예: just serve-custom 127.0.0.1 5001)
+serve-custom host port:
+    @echo "starting FastAPI server ({{host}}:{{port}})..."
+    uv run uvicorn app.main:app --reload --host {{host}} --port {{port}}
+
+# server.py 쓰고 싶을 때 (네가 만든 launcher 활용)
+serve-dev-py:
+    @echo "starting FastAPI via server.py..."
+    uv run python server.py
+
+
+# =========================
+# Alembic
+# =========================
+
+# 현재 마이그레이션 상태 확인
+alembic-current:
+    uv run alembic current
+
+# 마이그레이션 히스토리 확인
+alembic-history:
+    uv run alembic history --verbose
+
+# 현재 head들 확인 (브랜치 여러개일 때)
+alembic-heads:
+    uv run alembic heads
+
+# 새 마이그레이션 생성 (자동 감지)
+# ex:
+#   just alembic-revision "add scv_task table"
+alembic-revision msg:
+    uv run alembic revision --autogenerate -m "{{msg}}"
+
+# create blank migration 
+#   just alembic-revision-blank "custom sql"
+alembic-revision-blank msg:
+    uv run alembic revision -m "{{msg}}"
+
+# 마이그레이션 적용 (기본: head까지)
+# 사용 예시:
+#   just alembic-upgrade         # head까지
+#   just alembic-upgrade base    # base까지
+#   just alembic-upgrade 1234    # 특정 리비전
+alembic-upgrade rev="head":
+    uv run alembic upgrade {{rev}}
+
+# 마이그레이션 롤백
+# 사용 예시:
+#   just alembic-downgrade -1      # 한 단계 롤백
+#   just alembic-downgrade base    # 초기 상태로
+alembic-downgrade rev:
+    uv run alembic downgrade {{rev}}
+
+# 특정 리비전으로 DB 상태만 표시(stamp) – 실제 스키마 변경 없이 version만 맞추기
+# 사용 예시:
+#   just alembic-stamp head
+#   just alembic-stamp base
+alembic-stamp rev:
+    uv run alembic stamp {{rev}}
+
+
+# =========================
+# DB / 개발 유틸
+# =========================
+
+# DB 쉘 진입 (psql) - DATABASE_URL에서 +asyncpg 제거해서 접속
+# 사용 전: DATABASE_URL 환경변수 설정 필요
+db-shell:
+    @echo "🔗 connecting to DB using \$DATABASE_URL..."
+    @if [ -z "$DATABASE_URL" ]; then \
+        echo "❌ DATABASE_URL is not set"; \
+        exit 1; \
+    fi
+    @psql "$${DATABASE_URL/+asyncpg/}"
+
+# Python REPL (app 컨텍스트에서)
+py-shell:
+    uv run python
+
+# check FastAPI + 라이브러리 버전 확인
+versions:
+    uv run python -c "import sys; print('Python', sys.version)"
+    uv run python -c "import fastapi, sqlalchemy; print('FastAPI', fastapi.__version__, 'SQLAlchemy', sqlalchemy.__version__)"

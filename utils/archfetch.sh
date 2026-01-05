@@ -1,4 +1,5 @@
 #!/bin/sh
+
 name=$USER
 host=$(cat /proc/sys/kernel/hostname)
 distro=$(tail -n 1 /etc/lsb-release | sed s/DISTRIB_DESCRIPTION=//g | sed s/\"//g)

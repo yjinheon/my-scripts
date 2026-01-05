@@ -1,0 +1,19 @@
+{
+  "backendAddressPools": [
+    {
+      "backendAddressPool": {
+        "id": "/subscriptions/49349259-f37a-48e2-939f-c2815012b630/resourceGroups/scv/providers/Microsoft.Network/applicationGateways/scv-appgw/backendAddressPools/appGatewayBackendPool",
+        "resourceGroup": "scv"
+      },
+      "backendHttpSettingsCollection": [
+        {
+          "backendHttpSettings": {
+            "id": "/subscriptions/49349259-f37a-48e2-939f-c2815012b630/resourceGroups/scv/providers/Microsoft.Network/applicationGateways/scv-appgw/backendHttpSettingsCollection/appGatewayBackendHttpSettings",
+            "resourceGroup": "scv"
+          },
+          "servers": []
+        }
+      ]
+    }
+  ]
+}
