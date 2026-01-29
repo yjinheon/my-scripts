@@ -1,0 +1,155 @@
+set shell := ["bash", "-c"]
+
+# [Global] 
+alias := "tkc-minio"
+
+default:
+    @just --list
+
+# ====================================================
+# 서버 연결 및 설정 (Auth & Connection)
+# ====================================================
+
+# 신규 서버 등록
+# just auth-add http://ip:9000 accessKey secretKey
+auth-add endpoint access secret:
+    mc alias set {{alias}} {{endpoint}} {{access}} {{secret}}
+
+# 02. 등록된 서버 목록 확인
+auth-list:
+    mc alias list
+
+# 03. 서버 연결 상태 및 버전 확인
+auth-check:
+    mc admin info {{alias}}
+
+# 04. 서버 등록 해제
+auth-rm:
+    mc alias rm {{alias}}
+
+# ====================================================
+# 버킷 관리 (Bucket Operations)
+# ====================================================
+
+# 05. 버킷 생성
+mb name:
+    mc mb --ignore-existing {{alias}}/{{name}}
+
+# 06. 버전 관리(Versioning) 기능이 켜진 버킷 생성 (실무 권장)
+mb-ver name:
+    mc mb --with-versioning --ignore-existing {{alias}}/{{name}}
+
+# 07. 버킷 목록 조회
+ls-b:
+    mc ls {{alias}}
+
+# 08. 버킷 용량 및 객체 수 요약 조회
+usage name:
+    mc ls --summarize {{alias}}/{{name}}
+
+# 09. 버킷 삭제 (비어있을 때만)
+rb name:
+    mc rb {{alias}}/{{name}}
+
+# 10. 버킷 강제 삭제 (내용물 포함 - 주의!)
+rb-force name:
+    @echo "경고: {{name}} 버킷과 모든 데이터가 삭제됩니다."
+    mc rb --force {{alias}}/{{name}}
+
+# 11. 버킷에 수명주기(Lifecycle) 설정 (N일 뒤 자동 삭제)
+# 사용법: just set-expiry my-bucket 30
+set-expiry name days:
+    mc ilm add --expiry-days {{days}} {{alias}}/{{name}}
+
+# ====================================================
+# [3] 파일 전송 및 동기화 (Transfer & Sync)
+# ====================================================
+
+# 12. 파일/폴더 업로드 (단순 복사)
+cp-up src dest_path:
+    mc cp --recursive {{src}} {{alias}}/{{dest_path}}
+
+# 13. 파일 다운로드
+cp-down src_path local_dest:
+    mc cp --recursive {{alias}}/{{src_path}} {{local_dest}}
+
+# 14. 로컬 -> 서버 동기화 (Mirroring)
+# 특징: 로컬에 없는 파일은 서버에서도 삭제 (--remove) / 덮어쓰기 허용
+sync-up local_dir remote_bucket:
+    mc mirror --remove --overwrite {{local_dir}} {{alias}}/{{remote_bucket}}
+
+# 15. 서버 -> 로컬 동기화 (백업)
+sync-down remote_bucket local_dir:
+    mc mirror --remove --overwrite {{alias}}/{{remote_bucket}} {{local_dir}}
+
+# 16. 안전한 동기화
+sync-check local_dir remote_bucket:
+    mc mirror --dry-run --remove {{local_dir}} {{alias}}/{{remote_bucket}}
+
+# 17. 대용량 폴더 가속 업로드 (멀티스레드)
+fast-upload local_dir remote_bucket:
+    mc cp --recursive --parallel 16 {{local_dir}} {{alias}}/{{remote_bucket}}
+
+# 18. 중단된 업로드 이어받기
+resume remote_path:
+    mc session resume {{remote_path}}
+
+# ====================================================
+# [4] 데이터 조작 및 탐색 (Data Ops)
+# ====================================================
+
+# 19. 파일 내용 보기 (cat)
+cat remote_file:
+    mc cat {{alias}}/{{remote_file}}
+
+# 20. 파일/폴더 삭제 (CRUD: Delete)
+rm remote_path:
+    mc rm --recursive --force {{alias}}/{{remote_path}}
+
+# 21. 특정 패턴 파일 검색 (예: just find my-bucket "*.log")
+find bucket pattern:
+    mc find {{alias}}/{{bucket}} --name {{pattern}}
+
+# 22. 대용량 파일(100MB+) 검색
+find-big bucket size="+100MB":
+    mc find {{alias}}/{{bucket}} --size {{size}}
+
+# 23. 최근 24시간 내 변경된 파일 찾기
+find-recent bucket:
+    mc find {{alias}}/{{bucket}} --newer-than "24h"
+
+# 24. 로컬과 서버 간 파일 차이 비교 (Diff)
+diff local_dir remote_bucket:
+    mc diff {{local_dir}} {{alias}}/{{remote_bucket}}
+
+# 25. 실패한/미완료된 업로드 조각 정리 (디스크 확보)
+clean-garbage bucket:
+    mc rm --incomplete --recursive {{alias}}/{{bucket}}
+
+# ====================================================
+# [5] 보안 및 공유 (Security & Admin)
+# ====================================================
+
+# 26. 임시 다운로드 링크 생성 (기본 1시간)
+share path time="1h":
+    mc share download --expire {{time}} {{alias}}/{{path}}
+
+# 27. 버킷을 '공개(Public)'로 설정 (누구나 읽기 가능)
+public-set bucket:
+    mc anonymous set download {{alias}}/{{bucket}}
+
+# 28. 버킷을 '비공개(Private)'로 설정
+public-unset bucket:
+    mc anonymous set none {{alias}}/{{bucket}}
+
+# 29. 사용자 추가
+user-add new_user new_password:
+    mc admin user add {{alias}} {{new_user}} {{new_password}}
+
+# 30. 사용자에게 읽기/쓰기 권한 부여
+policy-set user policy="readwrite":
+    mc admin policy set {{alias}} {{policy}} user={{user}}
+
+# 31. 실시간 이벤트 모니터링 (로그 확인용)
+watch bucket:
+    mc watch {{alias}}/{{bucket}}
