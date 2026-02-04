@@ -146,10 +146,24 @@ public-unset bucket:
 user-add new_user new_password:
     mc admin user add {{alias}} {{new_user}} {{new_password}}
 
-# 30. 사용자에게 읽기/쓰기 권한 부여
 policy-set user policy="readwrite":
     mc admin policy set {{alias}} {{policy}} user={{user}}
 
-# 31. 실시간 이벤트 모니터링 (로그 확인용)
+# 실시간 이벤트 모니터링
 watch bucket:
     mc watch {{alias}}/{{bucket}}
+
+
+create-partner user pw bucket:
+    # 1. 유저 생성
+    mc admin user add {{alias}} {{user}} {{pw}}
+    
+    # 2. 특정버킷용
+    @echo '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:*"],"Resource":["arn:aws:s3:::{{bucket}}","arn:aws:s3:::{{bucket}}/*"]}]}' > /tmp/policy-{{user}}.json
+    
+    # 3. 정책 등록 및 연결
+    mc admin policy create {{alias}} policy-{{user}} /tmp/policy-{{user}}.json
+    mc admin policy attach {{alias}} policy-{{user}} --user {{user}}
+    # 4. 임시 파일 삭제
+    @rm /tmp/policy-{{user}}.json
+    @echo "{{user}} 계정이 생성되었으며, {{bucket}} 버킷에 대한 권한이 부여되었습니다."
