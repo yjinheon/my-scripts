@@ -1,0 +1,25 @@
+set shell := ["bash", "-c"]
+
+# [Global] 
+#alias := "openclaw"
+
+default:
+    @just --list
+
+migrate:
+  openclaw migrate
+
+# restart service
+
+restart-service:
+  openclaw daemon restart && openclaw gateway restart && openclaw status
+
+# diagnose status
+
+doctor:
+  openclaw doctor
+
+channels-status:
+  openclaw channels status --probe
+
+
