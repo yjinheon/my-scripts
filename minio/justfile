@@ -1,8 +1,9 @@
 set shell := ["bash", "-c"]
 
 # [Global] 
-alias := "tkc-minio"
 
+alias := "g14-rustfs"
+name := "finance"
 default:
     @just --list
 

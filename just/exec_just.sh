@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 set -euo pipefail
 
 export DEFAULT_JUST_ROOT=~/workspace/my-scripts/just
@@ -69,8 +70,38 @@ if [ -z "$CMD" ]; then
   exit 0
 fi
 
+# Parse the recipe signature first line (e.g. "recipe p1 p2='default' +p3:")
+# and prompt the user for each parameter on /dev/tty so it works when stdout is captured.
+sig=$(just -f "$JUSTFILE" -d "$JUST_DIR" --show "$CMD" |
+  awk '!/^[[:space:]]*#/ && /:[[:space:]]*$/ { print; exit }')
+sig="${sig%:}"
+sig="${sig%"${sig##*[![:space:]]}"}"
+read -r -a tokens <<<"$sig"
+
+args=()
+for tok in "${tokens[@]:1}"; do
+  # strip variadic prefixes (+param, *param)
+  tok="${tok#+}"
+  tok="${tok#\*}"
+  name="${tok%%=*}"
+  default=""
+  if [[ "$tok" == *=* ]]; then
+    default="${tok#*=}"
+    default="${default%\"}"
+    default="${default#\"}"
+    default="${default%\'}"
+    default="${default#\'}"
+    printf '%s [%s]: ' "$name" "$default" >/dev/tty
+  else
+    printf '%s: ' "$name" >/dev/tty
+  fi
+  IFS= read -r val </dev/tty || val=""
+  [ -z "$val" ] && val="$default"
+  args+=("$val")
+done
+
 # Run a dry-run with the selected recipes for verification.
-dry_run_output=$(just -f "$JUSTFILE" -d "$JUST_DIR" --dry-run "$@" "$CMD" 2>&1 | sed '$!s/$/ \&\&/')
+dry_run_output=$(just -f "$JUSTFILE" -d "$JUST_DIR" --dry-run "$@" "$CMD" "${args[@]}" 2>&1 | sed '$!s/$/ \&\&/')
 
 # Output the dry-run commands.
 # You can modify this part to integrate with your shell's command line replacement (e.g., using zsh's print -z).
